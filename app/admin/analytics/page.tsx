@@ -15,13 +15,10 @@ import {
   ResponsiveContainer,
   LineChart,
   Line,
-  PieChart,
-  Pie,
-  Cell,
   AreaChart,
   Area,
 } from 'recharts';
-import { Activity, BarChart3, Clock3, Globe2, ScanLine, Users } from 'lucide-react';
+import { BarChart3, ScanLine, Users } from 'lucide-react';
 
 interface ProductAnalytics {
   product_id: string;
@@ -81,8 +78,6 @@ interface SystemAnalytics {
     to: string;
   };
 }
-
-const CHART_COLORS = ['#0f766e', '#16a34a', '#ca8a04', '#0891b2', '#65a30d', '#f59e0b', '#84cc16', '#14b8a6'];
 
 const numberFormatter = new Intl.NumberFormat('vi-VN');
 
@@ -203,9 +198,6 @@ export default function AnalyticsPage() {
   }, [timeframe, granularity]);
 
   const selectedProduct = products.find((p) => p._id === selectedProductId);
-  const countryTotal = analytics?.top_countries.reduce((sum, item) => sum + item.count, 0) || 0;
-  const systemCountryTotal = systemAnalytics?.top_countries.reduce((sum, item) => sum + item.count, 0) || 0;
-
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -263,7 +255,7 @@ export default function AnalyticsPage() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                     <div className="rounded-lg border p-4 bg-muted/30">
                       <p className="text-sm text-muted-foreground">Tổng sản phẩm</p>
                       <p className="text-3xl font-bold text-primary">{numberFormatter.format(systemAnalytics.total_products)}</p>
@@ -279,84 +271,28 @@ export default function AnalyticsPage() {
                       <p className="text-3xl font-bold text-primary">{numberFormatter.format(systemAnalytics.range_scans)}</p>
                       <p className="text-xs text-muted-foreground mt-1">Tổng tích lũy: {numberFormatter.format(systemAnalytics.total_scans)}</p>
                     </div>
-                    <div className="rounded-lg border p-4 bg-muted/30">
-                      <p className="text-sm text-muted-foreground">Người dùng duy nhất</p>
-                      <p className="text-3xl font-bold text-primary">{numberFormatter.format(systemAnalytics.unique_visitors)}</p>
-                      <p className="text-xs text-muted-foreground mt-1">Tỉ lệ quét/truy cập: {systemAnalytics.verification_rate}%</p>
-                    </div>
-                    <div className="rounded-lg border p-4 bg-muted/30">
-                      <p className="text-sm text-muted-foreground">Giờ quét cao điểm</p>
-                      <p className="text-3xl font-bold text-primary">{systemAnalytics.peak_scan_hour}</p>
-                      <p className="text-xs text-muted-foreground mt-1">TB quét/người: {systemAnalytics.average_scans_per_visitor}</p>
-                    </div>
                   </div>
                 </CardContent>
               </Card>
 
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <Card className="xl:col-span-2">
-                  <CardHeader>
-                    <CardTitle>Xu hướng toàn hệ thống</CardTitle>
-                    <CardDescription>So sánh truy cập và quét theo thời gian</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={300}>
-                      <AreaChart data={systemAnalytics.trend}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="label" minTickGap={24} />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Area type="monotone" dataKey="visits" stroke="#0f766e" fill="#99f6e4" fillOpacity={0.4} name="Lượt truy cập" />
-                        <Line type="monotone" dataKey="scans" stroke="#16a34a" strokeWidth={2.2} dot={false} name="Lượt quét" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Top quốc gia (hệ thống)</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {systemAnalytics.top_countries.length > 0 ? (
-                      <>
-                        <ResponsiveContainer width="100%" height={220}>
-                          <PieChart>
-                            <Pie
-                              data={systemAnalytics.top_countries}
-                              dataKey="count"
-                              nameKey="country"
-                              innerRadius={48}
-                              outerRadius={80}
-                              paddingAngle={2}
-                            >
-                              {systemAnalytics.top_countries.map((entry, index) => (
-                                <Cell key={entry.country} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="space-y-2 mt-3">
-                          {systemAnalytics.top_countries.slice(0, 4).map((item, idx) => (
-                            <div key={item.country} className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} />
-                                <span className="text-muted-foreground">{item.country}</span>
-                              </div>
-                              <span className="font-semibold">
-                                {item.count} ({systemCountryTotal > 0 ? Math.round((item.count / systemCountryTotal) * 100) : 0}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Chưa có dữ liệu vị trí hệ thống.</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Xu hướng toàn hệ thống</CardTitle>
+                  <CardDescription>So sánh truy cập và quét theo thời gian</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={300}>
+                    <AreaChart data={systemAnalytics.trend}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" minTickGap={24} />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="visits" stroke="#0f766e" fill="#99f6e4" fillOpacity={0.4} name="Lượt truy cập" />
+                      <Line type="monotone" dataKey="scans" stroke="#16a34a" strokeWidth={2.2} dot={false} name="Lượt quét" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
               <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
                 <Card className="xl:col-span-3">
@@ -443,7 +379,7 @@ export default function AnalyticsPage() {
           {selectedProduct && analytics && !analyticsLoading ? (
             <>
               {/* Stats Cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <Card>
                   <CardHeader>
                     <CardDescription className="flex items-center gap-2">
@@ -469,106 +405,31 @@ export default function AnalyticsPage() {
                     <p className="text-xs text-muted-foreground mt-1">Tổng tích lũy: {numberFormatter.format(analytics.total_scans)}</p>
                   </CardContent>
                 </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardDescription className="flex items-center gap-2">
-                      <Activity className="w-4 h-4" />
-                      Người Dùng Duy Nhất
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-primary">{numberFormatter.format(analytics.unique_visitors)}</div>
-                    <p className="text-xs text-muted-foreground mt-1">Tỉ lệ quét/truy cập: {analytics.verification_rate}%</p>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardDescription className="flex items-center gap-2">
-                      <Clock3 className="w-4 h-4" />
-                      Khung Giờ Quét Cao Điểm
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-3xl font-bold text-primary">{analytics.peak_scan_hour}</div>
-                    <p className="text-xs text-muted-foreground mt-1">TB lượt quét/người: {analytics.average_scans_per_visitor}</p>
-                  </CardContent>
-                </Card>
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-6">
-                <Card className="xl:col-span-2">
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <BarChart3 className="w-5 h-5" />
-                      Xu hướng truy cập và quét
-                    </CardTitle>
-                    <CardDescription>
-                      Từ {formatDateTime(analytics.filters.from)} đến {formatDateTime(analytics.filters.to)}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <ResponsiveContainer width="100%" height={320}>
-                      <AreaChart data={analytics.trend}>
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="label" minTickGap={24} />
-                        <YAxis allowDecimals={false} />
-                        <Tooltip />
-                        <Area type="monotone" dataKey="visits" stroke="#0f766e" fill="#99f6e4" fillOpacity={0.4} name="Lượt truy cập" />
-                        <Line type="monotone" dataKey="scans" stroke="#16a34a" strokeWidth={2.2} dot={false} name="Lượt quét" />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="flex items-center gap-2">
-                      <Globe2 className="w-5 h-5" />
-                      Quốc gia truy cập
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    {analytics.top_countries.length > 0 ? (
-                      <>
-                        <ResponsiveContainer width="100%" height={220}>
-                          <PieChart>
-                            <Pie
-                              data={analytics.top_countries}
-                              dataKey="count"
-                              nameKey="country"
-                              innerRadius={50}
-                              outerRadius={82}
-                              paddingAngle={2}
-                            >
-                              {analytics.top_countries.map((entry, index) => (
-                                <Cell key={entry.country} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                              ))}
-                            </Pie>
-                            <Tooltip />
-                          </PieChart>
-                        </ResponsiveContainer>
-                        <div className="space-y-2 mt-3">
-                          {analytics.top_countries.slice(0, 4).map((item, idx) => (
-                            <div key={item.country} className="flex items-center justify-between text-sm">
-                              <div className="flex items-center gap-2">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }} />
-                                <span className="text-muted-foreground">{item.country}</span>
-                              </div>
-                              <span className="font-semibold">
-                                {item.count} ({countryTotal > 0 ? Math.round((item.count / countryTotal) * 100) : 0}%)
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    ) : (
-                      <p className="text-sm text-muted-foreground">Chưa có dữ liệu vị trí để hiển thị.</p>
-                    )}
-                  </CardContent>
-                </Card>
-              </div>
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5" />
+                    Xu hướng truy cập và quét
+                  </CardTitle>
+                  <CardDescription>
+                    Từ {formatDateTime(analytics.filters.from)} đến {formatDateTime(analytics.filters.to)}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <ResponsiveContainer width="100%" height={320}>
+                    <AreaChart data={analytics.trend}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="label" minTickGap={24} />
+                      <YAxis allowDecimals={false} />
+                      <Tooltip />
+                      <Area type="monotone" dataKey="visits" stroke="#0f766e" fill="#99f6e4" fillOpacity={0.4} name="Lượt truy cập" />
+                      <Line type="monotone" dataKey="scans" stroke="#16a34a" strokeWidth={2.2} dot={false} name="Lượt quét" />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </CardContent>
+              </Card>
 
               <Card className="mb-6">
                 <CardHeader>

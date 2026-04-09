@@ -27,6 +27,29 @@ const normalizePackagingUnit = (value) => {
     return LEGACY_PACKAGING_UNIT_MAP[cleaned] || cleaned;
 };
 
+const PACKAGING_UNIT_COORDINATES = {
+    'Công ty TNHH Đóng gói Mekong Green': { lat: 10.045161, lng: 105.746857 },
+    'Công ty CP Bao Bì Nông Sản Bến Tre': { lat: 10.243355, lng: 106.375551 },
+    'Công ty TNHH Sơ chế Nông sản Trà Vinh': { lat: 9.951331, lng: 106.33461 },
+    'Công ty CP Chế biến và Đóng gói VinaFarm': { lat: 20.852571, lng: 106.016997 },
+    'Công ty TNHH Đóng gói Nông sản Nam Bộ': { lat: 10.695572, lng: 106.243122 },
+    'Công ty CP Dịch vụ Hậu cần Nông nghiệp An Phú': { lat: 10.53592, lng: 107.242998 },
+    'HTX Sơ chế và Đóng gói Cầu Kè': { lat: 9.867622, lng: 106.086487 },
+    'Trung tâm Đóng gói Nông sản Đồng Khởi': { lat: 10.241987, lng: 106.376754 },
+};
+
+const isValidCoordinatePair = (coordinates) => {
+    const lat = Number(coordinates?.lat);
+    const lng = Number(coordinates?.lng);
+
+    return Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+};
+
+const areCoordinatesEqual = (left, right) => {
+    if (!left || !right) return false;
+    return Number(left.lat) === Number(right.lat) && Number(left.lng) === Number(right.lng);
+};
+
 const productSchema = new mongoose.Schema(
     {
         origin: {
@@ -41,6 +64,7 @@ const Product = mongoose.models.ProductMigration || mongoose.model('ProductMigra
 
 async function normalizeLegacyPackagingUnits() {
     const dryRun = process.argv.includes('--dry-run');
+    const coordinatesOnly = process.argv.includes('--coordinates-only');
 
     try {
         await mongoose.connect(MONGODB_URI);
@@ -49,28 +73,61 @@ async function normalizeLegacyPackagingUnits() {
         const products = await Product.find({}, { _id: 1, batch_code: 1, origin: 1 }).lean();
 
         let changedCount = 0;
+        let regionChangedCount = 0;
+        let coordinateChangedCount = 0;
         const updates = [];
 
         for (const product of products) {
             const original = product?.origin?.region;
-            const normalized = normalizePackagingUnit(original);
+            const normalizedRegion = normalizePackagingUnit(original);
+            const mappedCoordinates = PACKAGING_UNIT_COORDINATES[normalizedRegion];
+            const existingCoordinates = product?.origin?.coordinates;
+            const nextSet = {};
 
-            if (!original || !normalized || original === normalized) continue;
+            if (!coordinatesOnly && original && normalizedRegion && original !== normalizedRegion) {
+                nextSet['origin.region'] = normalizedRegion;
+            }
 
+            if (mappedCoordinates && !areCoordinatesEqual(existingCoordinates, mappedCoordinates)) {
+                const hasInvalidCoordinates = !!existingCoordinates && !isValidCoordinatePair(existingCoordinates);
+                const hasMissingCoordinates = !existingCoordinates;
+                const shouldUpdateCoordinates = hasMissingCoordinates || hasInvalidCoordinates || !areCoordinatesEqual(existingCoordinates, mappedCoordinates);
+
+                if (shouldUpdateCoordinates) {
+                    nextSet['origin.coordinates'] = mappedCoordinates;
+                }
+            }
+
+            if (Object.keys(nextSet).length === 0) continue;
+
+            const nextRegion = nextSet['origin.region'];
+            const nextCoordinates = nextSet['origin.coordinates'];
+
+            if (nextRegion) regionChangedCount += 1;
+            if (nextCoordinates) coordinateChangedCount += 1;
             changedCount += 1;
+
             updates.push({
                 updateOne: {
                     filter: { _id: product._id },
                     update: {
                         $set: {
-                            'origin.region': normalized,
+                            ...nextSet,
                             updated_at: new Date(),
                         },
                     },
                 },
             });
 
-            console.log(`- ${product.batch_code || product._id}: "${original}" -> "${normalized}"`);
+            const logParts = [];
+            if (nextRegion) {
+                logParts.push(`vùng: "${original}" -> "${normalizedRegion}"`);
+            }
+            if (nextCoordinates) {
+                logParts.push(`tọa độ -> (${nextCoordinates.lat}, ${nextCoordinates.lng})`);
+            }
+
+            console.log(`- ${product.batch_code || product._id}: ${logParts.join(' | ')}`);
         }
 
         if (changedCount === 0) {
@@ -81,6 +138,8 @@ async function normalizeLegacyPackagingUnits() {
 
         if (dryRun) {
             console.log(`ℹ️ DRY RUN: phát hiện ${changedCount} bản ghi cần cập nhật, chưa ghi vào DB.`);
+            console.log(`  thay đổi đơn vị đóng gói: ${regionChangedCount}`);
+            console.log(`  thay đổi tọa độ: ${coordinateChangedCount}`);
             await mongoose.disconnect();
             return;
         }
@@ -88,6 +147,8 @@ async function normalizeLegacyPackagingUnits() {
         const result = await Product.bulkWrite(updates, { ordered: false });
 
         console.log(`✓ Đã chuẩn hóa ${changedCount} bản ghi.`);
+        console.log(`  thay đổi đơn vị đóng gói: ${regionChangedCount}`);
+        console.log(`  thay đổi tọa độ: ${coordinateChangedCount}`);
         console.log(`  matched: ${result.matchedCount || 0}`);
         console.log(`  modified: ${result.modifiedCount || 0}`);
 

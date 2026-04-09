@@ -9,6 +9,38 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { MapPin, Leaf, Shield, User, Calendar, BarChart3, CheckCircle2, Circle } from 'lucide-react';
 import { normalizeProductImageUrl } from '@/lib/product-image';
 
+const LEGACY_PACKAGING_UNIT_MAP: Record<string, string> = {
+  'Đông Bắc Bộ': 'Công ty CP Bao Bì Nông Sản Bến Tre',
+  'Tây Bắc Bộ': 'Công ty TNHH Đóng gói Nông sản Nam Bộ',
+  'Đồng Bằng Sông Hồng': 'Công ty CP Chế biến và Đóng gói VinaFarm',
+  'Bắc Trung Bộ': 'Công ty TNHH Sơ chế Nông sản Trà Vinh',
+  'Duyên Hải Nam Trung Bộ': 'Trung tâm Đóng gói Nông sản Đồng Khởi',
+  'Tây Nguyên': 'HTX Sơ chế và Đóng gói Cầu Kè',
+  'Đông Nam Bộ': 'Công ty TNHH Đóng gói Mekong Green',
+  'Đồng Bằng Sông Cửu Long': 'Công ty CP Bao Bì Nông Sản Bến Tre',
+  'Nam Trung Bộ': 'Công ty CP Dịch vụ Hậu cần Nông nghiệp An Phú',
+};
+
+const PACKAGING_UNIT_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  'Công ty TNHH Đóng gói Mekong Green': { lat: 10.045161, lng: 105.746857 },
+  'Công ty CP Bao Bì Nông Sản Bến Tre': { lat: 10.243355, lng: 106.375551 },
+  'Công ty TNHH Sơ chế Nông sản Trà Vinh': { lat: 9.951331, lng: 106.33461 },
+  'Công ty CP Chế biến và Đóng gói VinaFarm': { lat: 20.852571, lng: 106.016997 },
+  'Công ty TNHH Đóng gói Nông sản Nam Bộ': { lat: 10.695572, lng: 106.243122 },
+  'Công ty CP Dịch vụ Hậu cần Nông nghiệp An Phú': { lat: 10.53592, lng: 107.242998 },
+  'HTX Sơ chế và Đóng gói Cầu Kè': { lat: 9.867622, lng: 106.086487 },
+  'Trung tâm Đóng gói Nông sản Đồng Khởi': { lat: 10.241987, lng: 106.376754 },
+};
+
+const normalizePackagingUnit = (value: string): string => {
+  const cleaned = value.replace(/\s+/g, ' ').trim();
+  if (!cleaned) return '';
+  return LEGACY_PACKAGING_UNIT_MAP[cleaned] || cleaned;
+};
+
+const isValidCoordinatePair = (lat: number, lng: number): boolean =>
+  Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+
 interface Product {
   _id: string;
   name: string;
@@ -77,6 +109,19 @@ export default function ProductDetail({ product }: { product: Product }) {
   const lotStatus = normalizeLotStatus(product.traceability.status || product.traceability.certification.cert_number);
   const safeDate = (date: Date | null) => (date && !Number.isNaN(date.getTime()) ? date.toLocaleDateString('vi-VN') : '--/--/----');
   const normalizedImageUrl = normalizeProductImageUrl(product.image_url);
+  const normalizedPackagingUnit = normalizePackagingUnit(product.origin.region || '');
+  const inputCoordinates = product.origin.coordinates;
+
+  const displayCoordinates = inputCoordinates && isValidCoordinatePair(inputCoordinates.lat, inputCoordinates.lng)
+    ? inputCoordinates
+    : PACKAGING_UNIT_COORDINATES[normalizedPackagingUnit];
+
+  const googleMapsEmbedUrl = displayCoordinates
+    ? `https://maps.google.com/maps?q=${displayCoordinates.lat},${displayCoordinates.lng}&z=15&output=embed`
+    : null;
+  const googleMapsDirectionsUrl = displayCoordinates
+    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${displayCoordinates.lat},${displayCoordinates.lng}`)}`
+    : null;
 
   const isLegacyStatusValue = (value?: string) =>
     value === 'Đang sơ chế' || value === 'Đang lưu thông' || value === 'Đã bán hết' || value === 'Đã tiêu thụ' || value === 'Đã đóng gói' || value === 'Tạm ngừng';
@@ -230,12 +275,35 @@ export default function ProductDetail({ product }: { product: Product }) {
                   <p className="text-foreground/90">{product.origin.producer_name}</p>
                 </div>
 
-                {product.origin.coordinates && (
+                {displayCoordinates && (
                   <div className="border-t pt-4">
-                    <p className="text-sm text-muted-foreground mb-2">Tọa độ</p>
+                    <p className="text-sm text-muted-foreground mb-2">Tọa độ đơn vị sơ chế / đóng gói</p>
                     <p className="text-foreground/90">
-                      Vĩ độ: {product.origin.coordinates.lat.toFixed(4)}, Kinh độ: {product.origin.coordinates.lng.toFixed(4)}
+                      Vĩ độ: {displayCoordinates.lat.toFixed(6)}, Kinh độ: {displayCoordinates.lng.toFixed(6)}
                     </p>
+
+                    {googleMapsEmbedUrl && (
+                      <div className="mt-3 overflow-hidden rounded-lg border border-border bg-muted/20">
+                        <iframe
+                          title={`Bản đồ ${normalizedPackagingUnit || 'đơn vị sơ chế / đóng gói'}`}
+                          src={googleMapsEmbedUrl}
+                          className="h-72 w-full"
+                          loading="lazy"
+                          referrerPolicy="no-referrer-when-downgrade"
+                        />
+                      </div>
+                    )}
+
+                    {googleMapsDirectionsUrl && (
+                      <a
+                        href={googleMapsDirectionsUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-3 inline-flex text-sm font-medium text-primary underline underline-offset-4"
+                      >
+                        Mở vị trí trên Google Maps
+                      </a>
+                    )}
                   </div>
                 )}
               </CardContent>

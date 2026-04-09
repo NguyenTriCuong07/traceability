@@ -149,6 +149,25 @@ const normalizePackagingUnit = (value: string): string => {
   return LEGACY_PACKAGING_UNIT_MAP[cleaned] || cleaned;
 };
 
+const PACKAGING_UNIT_COORDINATES: Record<string, { lat: number; lng: number }> = {
+  'Công ty TNHH Đóng gói Mekong Green': { lat: 10.045161, lng: 105.746857 },
+  'Công ty CP Bao Bì Nông Sản Bến Tre': { lat: 10.243355, lng: 106.375551 },
+  'Công ty TNHH Sơ chế Nông sản Trà Vinh': { lat: 9.951331, lng: 106.33461 },
+  'Công ty CP Chế biến và Đóng gói VinaFarm': { lat: 20.852571, lng: 106.016997 },
+  'Công ty TNHH Đóng gói Nông sản Nam Bộ': { lat: 10.695572, lng: 106.243122 },
+  'Công ty CP Dịch vụ Hậu cần Nông nghiệp An Phú': { lat: 10.53592, lng: 107.242998 },
+  'HTX Sơ chế và Đóng gói Cầu Kè': { lat: 9.867622, lng: 106.086487 },
+  'Trung tâm Đóng gói Nông sản Đồng Khởi': { lat: 10.241987, lng: 106.376754 },
+};
+
+const isValidCoordinatePair = (lat: number, lng: number): boolean =>
+  Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
+
+const getPackagingUnitCoordinates = (packagingUnit: string): { lat: number; lng: number } | null => {
+  const normalized = normalizePackagingUnit(packagingUnit || '');
+  return PACKAGING_UNIT_COORDINATES[normalized] || null;
+};
+
 const normalizeLotStatus = (value?: string): 'Đang lưu thông' | 'Đang sơ chế' | 'Đã bán hết' => {
   if (value === 'Đang lưu thông' || value === 'Đang sơ chế' || value === 'Đã bán hết') {
     return value;
@@ -314,6 +333,28 @@ export function ProductForm({ initialData, isEditing }: ProductFormProps) {
     fetchSuggestions();
   }, []);
 
+  useEffect(() => {
+    const matchedCoordinates = getPackagingUnitCoordinates(formData.origin.region);
+    if (!matchedCoordinates) return;
+
+    setFormData((prev) => {
+      if (
+        prev.origin.coordinates.lat === matchedCoordinates.lat
+        && prev.origin.coordinates.lng === matchedCoordinates.lng
+      ) {
+        return prev;
+      }
+
+      return {
+        ...prev,
+        origin: {
+          ...prev.origin,
+          coordinates: matchedCoordinates,
+        },
+      };
+    });
+  }, [formData.origin.region]);
+
   const setNestedValue = (target: any, keys: string[], value: string | number): any => {
     if (keys.length === 1) {
       return {
@@ -437,6 +478,17 @@ export function ProductForm({ initialData, isEditing }: ProductFormProps) {
 
       const plantingDateIso = plantingDate.toISOString();
       const harvestDateIso = harvestDate.toISOString();
+      const normalizedRegion = normalizePackagingUnit(formData.origin.region);
+      const matchedCoordinates = getPackagingUnitCoordinates(normalizedRegion);
+      const inputLat = Number(formData.origin.coordinates.lat);
+      const inputLng = Number(formData.origin.coordinates.lng);
+
+      if (!matchedCoordinates && !isValidCoordinatePair(inputLat, inputLng)) {
+        toast.error('Vui lòng nhập tọa độ hợp lệ (Vĩ độ: -90..90, Kinh độ: -180..180)');
+        return;
+      }
+
+      const finalCoordinates = matchedCoordinates || { lat: inputLat, lng: inputLng };
 
       const packagingDateTs = toUtcDateOnlyTimestamp(plantingDate);
       const harvestDateTs = toUtcDateOnlyTimestamp(harvestDate);
@@ -502,12 +554,9 @@ export function ProductForm({ initialData, isEditing }: ProductFormProps) {
           province: formData.origin.province.trim(),
           district: formData.origin.district.trim() || undefined,
           farm_name: formData.origin.farm_name.trim(),
-          region: normalizePackagingUnit(formData.origin.region),
+          region: normalizedRegion,
           producer_name: formData.origin.producer_name.trim() || formData.origin.farm_name.trim(),
-          coordinates: {
-            lat: Number(formData.origin.coordinates.lat) || 0,
-            lng: Number(formData.origin.coordinates.lng) || 0,
-          },
+          coordinates: finalCoordinates,
         },
         traceability: {
           ...formData.traceability,
@@ -657,29 +706,33 @@ export function ProductForm({ initialData, isEditing }: ProductFormProps) {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="origin_lat" className="text-xl font-semibold text-foreground">Diện tích canh tác (ha)</Label>
+                <Label htmlFor="origin_lat" className="text-xl font-semibold text-foreground">Vĩ độ đơn vị sơ chế / đóng gói</Label>
                 <Input
                   id="origin_lat"
                   name="origin.coordinates.lat"
                   type="number"
-                  min="0"
-                  step="0.1"
+                  min="-90"
+                  max="90"
+                  step="0.000001"
                   value={formData.origin.coordinates.lat}
                   onChange={handleChange}
+                  placeholder="VD: 9.867622"
                   className="h-14 rounded-xl border-input bg-background text-lg text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/20"
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="origin_lng" className="text-xl font-semibold text-foreground">Khối lượng lô (kg)</Label>
+                <Label htmlFor="origin_lng" className="text-xl font-semibold text-foreground">Kinh độ đơn vị sơ chế / đóng gói</Label>
                 <Input
                   id="origin_lng"
                   name="origin.coordinates.lng"
                   type="number"
-                  min="0"
-                  step="0.1"
+                  min="-180"
+                  max="180"
+                  step="0.000001"
                   value={formData.origin.coordinates.lng}
                   onChange={handleChange}
+                  placeholder="VD: 106.086487"
                   className="h-14 rounded-xl border-input bg-background text-lg text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/20"
                 />
               </div>
@@ -791,6 +844,7 @@ export function ProductForm({ initialData, isEditing }: ProductFormProps) {
                   className="h-14 rounded-xl border-input bg-background text-lg text-foreground placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-ring/20"
                   required
                 />
+                <p className="text-sm text-muted-foreground">Tọa độ sẽ tự đồng bộ theo đơn vị sơ chế / đóng gói đã chọn.</p>
               </div>
 
               <div className="space-y-2">

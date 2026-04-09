@@ -13,6 +13,8 @@
     "auto-sync:task:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/unregister-auto-sync-task.ps1",
     "normalize:packaging-units": "node scripts/normalize-packaging-units.js",
     "normalize:packaging-units:dry": "node scripts/normalize-packaging-units.js --dry-run",
+    "normalize:packaging-coordinates": "node scripts/normalize-packaging-units.js --coordinates-only",
+    "normalize:packaging-coordinates:dry": "node scripts/normalize-packaging-units.js --coordinates-only --dry-run",
     "sync:analytics-counters": "node scripts/sync-analytics-counters.js"
   },
   "dependencies": {

@@ -13,7 +13,7 @@ export function Sidebar() {
   const handleLogout = () => {
     localStorage.removeItem('token');
     toast.success('Đăng xuất thành công');
-    router.push('/login');
+    router.push('/');
   };
 
   const links = [
@@ -26,7 +26,11 @@ export function Sidebar() {
     <aside className="w-64 bg-sidebar text-sidebar-foreground min-h-screen flex flex-col border-r border-sidebar-border">
       {/* Logo */}
       <div className="p-6 border-b border-sidebar-border">
-        <h1 className="text-2xl font-bold">TraceAgri</h1>
+        <h1 className="text-2xl font-bold">
+          <Link href="/" className="inline-block hover:opacity-90 transition-opacity">
+            TraceAgri
+          </Link>
+        </h1>
         <p className="text-sm text-sidebar-foreground/70">Bảng Điều Khiển Admin</p>
       </div>
 

@@ -7,6 +7,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "auto-sync:github": "node scripts/auto-sync-github.js",
+    "auto-sync:task:run": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/run-auto-sync.ps1",
+    "auto-sync:task:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-auto-sync-task.ps1 -StartNow",
+    "auto-sync:task:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/unregister-auto-sync-task.ps1",
     "normalize:packaging-units": "node scripts/normalize-packaging-units.js",
     "normalize:packaging-units:dry": "node scripts/normalize-packaging-units.js --dry-run"
   },

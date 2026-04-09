@@ -12,7 +12,8 @@
     "auto-sync:task:install": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/register-auto-sync-task.ps1 -StartNow",
     "auto-sync:task:uninstall": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/unregister-auto-sync-task.ps1",
     "normalize:packaging-units": "node scripts/normalize-packaging-units.js",
-    "normalize:packaging-units:dry": "node scripts/normalize-packaging-units.js --dry-run"
+    "normalize:packaging-units:dry": "node scripts/normalize-packaging-units.js --dry-run",
+    "sync:analytics-counters": "node scripts/sync-analytics-counters.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",

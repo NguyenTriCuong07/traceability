@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -104,6 +105,9 @@ export default function AnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [systemLoading, setSystemLoading] = useState(false);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [syncLoading, setSyncLoading] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   // Load products list
@@ -169,7 +173,7 @@ export default function AnalyticsPage() {
     };
 
     loadAnalytics();
-  }, [selectedProductId, timeframe, granularity]);
+  }, [selectedProductId, timeframe, granularity, refreshTick]);
 
   useEffect(() => {
     const loadSystemAnalytics = async () => {
@@ -195,7 +199,40 @@ export default function AnalyticsPage() {
     };
 
     loadSystemAnalytics();
-  }, [timeframe, granularity]);
+  }, [timeframe, granularity, refreshTick]);
+
+  const handleSyncNow = async () => {
+    try {
+      setSyncLoading(true);
+      setSyncMessage(null);
+      const token = localStorage.getItem('token');
+
+      const response = await fetch('/api/admin/analytics/sync', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const payload = await response.json();
+
+      if (!response.ok || !payload?.success) {
+        setSyncMessage(payload?.error || 'Đồng bộ thất bại.');
+        return;
+      }
+
+      const { updated_products, total_scans, total_visits } = payload.data;
+      setSyncMessage(
+        `Đồng bộ thành công: ${numberFormatter.format(updated_products)} sản phẩm, ${numberFormatter.format(total_scans)} lượt quét, ${numberFormatter.format(total_visits)} lượt truy cập.`
+      );
+      setRefreshTick((prev) => prev + 1);
+    } catch (syncError) {
+      console.error('Sync analytics error:', syncError);
+      setSyncMessage('Lỗi khi gọi API đồng bộ.');
+    } finally {
+      setSyncLoading(false);
+    }
+  };
 
   const selectedProduct = products.find((p) => p._id === selectedProductId);
   return (
@@ -203,6 +240,12 @@ export default function AnalyticsPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-foreground mb-2">Phân Tích</h1>
         <p className="text-muted-foreground">Theo dõi lượt truy cập, lượt quét, khung giờ quét và hành vi người dùng theo thời gian thực</p>
+        <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
+          <Button onClick={handleSyncNow} disabled={syncLoading || loading}>
+            {syncLoading ? 'Đang đồng bộ...' : 'Đồng bộ ngay'}
+          </Button>
+          {syncMessage && <p className="text-sm text-muted-foreground">{syncMessage}</p>}
+        </div>
       </div>
 
       <Card className="mb-6">

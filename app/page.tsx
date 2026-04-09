@@ -4,10 +4,18 @@ import { FormEvent, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { ProductThumbnail } from '@/components/ProductThumbnail';
 import { QrCode, BarChart3, Shield, Leaf, Search } from 'lucide-react';
-import { buildProductTraceUrl } from '@/lib/qr';
+import { buildProductTraceUrl, generateQRCode } from '@/lib/qr';
 
 interface Product {
   _id: string;
@@ -35,6 +43,11 @@ export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrError, setQrError] = useState('');
+  const [copiedLink, setCopiedLink] = useState(false);
 
   const loadProducts = async (searchTerm = '') => {
     try {
@@ -115,6 +128,46 @@ export default function Home() {
     return date.toLocaleDateString('vi-VN');
   };
 
+  const closeQrDialog = () => {
+    setSelectedProduct(null);
+    setQrCodeDataUrl(null);
+    setQrLoading(false);
+    setQrError('');
+    setCopiedLink(false);
+  };
+
+  const openQrDialog = async (product: Product) => {
+    setSelectedProduct(product);
+    setQrCodeDataUrl(null);
+    setQrError('');
+    setCopiedLink(false);
+    setQrLoading(true);
+
+    try {
+      const traceUrl = buildProductTraceUrl(product.slug);
+      const qrDataUrl = await generateQRCode(traceUrl);
+      setQrCodeDataUrl(qrDataUrl);
+    } catch (error) {
+      console.error('Không thể tạo mã QR:', error);
+      setQrError('Không thể tạo mã QR cho lô hàng này. Vui lòng thử lại.');
+    } finally {
+      setQrLoading(false);
+    }
+  };
+
+  const handleCopyTraceLink = async () => {
+    if (!selectedProduct) return;
+
+    try {
+      const traceUrl = buildProductTraceUrl(selectedProduct.slug);
+      await navigator.clipboard.writeText(traceUrl);
+      setCopiedLink(true);
+    } catch (error) {
+      console.error('Không thể sao chép link truy xuất:', error);
+      setCopiedLink(false);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-gradient-to-b from-background to-muted/40">
       {/* Header */}
@@ -142,7 +195,7 @@ export default function Home() {
           <div className="space-x-4">
             <Button size="lg" onClick={scrollToProductsSection}>
               <QrCode className="w-5 h-5 mr-2" />
-              Cách Hoạt Động
+              Truy Xuất Ngay
             </Button>
           </div>
         </div>
@@ -261,10 +314,14 @@ export default function Home() {
                                 Chi tiết
                               </Button>
                             </Link>
-                            <Button asChild size="sm" className="h-10 w-10 xl:h-12 xl:w-12 p-0" aria-label="Mở trang quét QR" title="Mở trang quét QR">
-                              <a href={buildProductTraceUrl(product.slug)} target="_blank" rel="noopener noreferrer">
-                                <QrCode className="w-4 h-4" />
-                              </a>
+                            <Button
+                              size="sm"
+                              className="h-10 w-10 xl:h-12 xl:w-12 p-0"
+                              aria-label={`Xem mã QR lô ${product.batch_code}`}
+                              title="Xem mã QR"
+                              onClick={() => openQrDialog(product)}
+                            >
+                              <QrCode className="w-4 h-4" />
                             </Button>
                           </div>
                         </td>
@@ -277,6 +334,54 @@ export default function Home() {
           </CardContent>
         </Card>
       </section>
+
+      <Dialog open={Boolean(selectedProduct)} onOpenChange={(open) => !open && closeQrDialog()}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Mã QR lô {selectedProduct?.batch_code}</DialogTitle>
+            <DialogDescription>
+              Quét mã để truy xuất thông tin chi tiết của lô hàng {selectedProduct?.name}.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-border bg-muted/20 p-4">
+            {qrLoading && (
+              <p className="text-sm text-muted-foreground text-center py-16">Đang tạo mã QR...</p>
+            )}
+
+            {!qrLoading && qrError && (
+              <p className="text-sm text-rose-500 text-center py-10">{qrError}</p>
+            )}
+
+            {!qrLoading && !qrError && qrCodeDataUrl && (
+              <img
+                src={qrCodeDataUrl}
+                alt={`Mã QR lô ${selectedProduct?.batch_code}`}
+                className="mx-auto h-64 w-64 rounded-md bg-white p-2"
+              />
+            )}
+          </div>
+
+          <DialogFooter className="sm:justify-between">
+            <Button variant="outline" onClick={closeQrDialog}>Đóng</Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleCopyTraceLink}
+                disabled={!selectedProduct}
+              >
+                {copiedLink ? 'Đã sao chép link' : 'Sao chép link truy xuất'}
+              </Button>
+              {qrCodeDataUrl && (
+                <a href={qrCodeDataUrl} download={`qr-${selectedProduct?.batch_code || 'product'}.png`}>
+                  <Button>Tải mã QR</Button>
+                </a>
+              )}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Footer */}
       <footer className="border-t border-border py-8 mt-20">

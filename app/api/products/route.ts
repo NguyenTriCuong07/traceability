@@ -8,6 +8,57 @@ const parseableDateString = z.string().trim().refine((value) => !Number.isNaN(Da
   message: 'Định dạng ngày không hợp lệ',
 });
 
+const toUtcDateOnlyTimestamp = (value: string | Date): number => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return Number.NaN;
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+};
+
+const validateProductDateTimeline = ({
+  packagingDate,
+  harvestDate,
+  expiryDate,
+}: {
+  packagingDate: string;
+  harvestDate: string;
+  expiryDate?: string;
+}): string | null => {
+  const packagingTs = toUtcDateOnlyTimestamp(packagingDate);
+  const harvestTs = toUtcDateOnlyTimestamp(harvestDate);
+
+  if (Number.isNaN(packagingTs) || Number.isNaN(harvestTs)) {
+    return 'Ngày thu hoạch hoặc ngày đóng gói không hợp lệ';
+  }
+
+  const now = new Date();
+  const todayTs = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+
+  if (harvestTs > todayTs) {
+    return 'Ngày thu hoạch không thể ở tương lai';
+  }
+
+  if (packagingTs > todayTs) {
+    return 'Ngày đóng gói không thể ở tương lai';
+  }
+
+  if (harvestTs > packagingTs) {
+    return 'Ngày thu hoạch phải trước hoặc bằng ngày đóng gói';
+  }
+
+  if (expiryDate) {
+    const expiryTs = toUtcDateOnlyTimestamp(expiryDate);
+    if (Number.isNaN(expiryTs)) {
+      return 'Hạn sử dụng không hợp lệ';
+    }
+
+    if (packagingTs > expiryTs) {
+      return 'Ngày đóng gói phải trước hoặc bằng hạn sử dụng';
+    }
+  }
+
+  return null;
+};
+
 const LEGACY_PACKAGING_UNIT_MAP: Record<string, string> = {
   'Đông Bắc Bộ': 'Công ty CP Bao Bì Nông Sản Bến Tre',
   'Tây Bắc Bộ': 'Công ty TNHH Đóng gói Nông sản Nam Bộ',
@@ -157,6 +208,19 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const validatedData = productSchema.parse(body);
+    const dateValidationError = validateProductDateTimeline({
+      packagingDate: validatedData.traceability.planting_date,
+      harvestDate: validatedData.traceability.harvest_date,
+      expiryDate: validatedData.traceability.certification.cert_expiry,
+    });
+
+    if (dateValidationError) {
+      return Response.json(
+        { success: false, error: dateValidationError },
+        { status: 400 }
+      );
+    }
+
     const normalizedStatus = normalizeLotStatusInput(validatedData.traceability.status);
     const normalizedOrigin = {
       ...validatedData.origin,

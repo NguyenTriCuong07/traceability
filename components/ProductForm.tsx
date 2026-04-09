@@ -160,6 +160,12 @@ const normalizeLotStatus = (value?: string): 'Đang lưu thông' | 'Đang sơ ch
   return 'Đang sơ chế';
 };
 
+const toUtcDateOnlyTimestamp = (value: string | Date): number => {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return Number.NaN;
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+};
+
 const mergeSuggestionArrays = (...arrays: string[][]) =>
   Array.from(
     new Set(
@@ -432,8 +438,28 @@ export function ProductForm({ initialData, isEditing }: ProductFormProps) {
       const plantingDateIso = plantingDate.toISOString();
       const harvestDateIso = harvestDate.toISOString();
 
-      if (harvestDate < plantingDate) {
-        toast.error('Ngày thu hoạch không thể trước ngày đóng gói');
+      const packagingDateTs = toUtcDateOnlyTimestamp(plantingDate);
+      const harvestDateTs = toUtcDateOnlyTimestamp(harvestDate);
+      const today = new Date();
+      const todayTs = Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate());
+
+      if (Number.isNaN(packagingDateTs) || Number.isNaN(harvestDateTs)) {
+        toast.error('Ngày thu hoạch hoặc ngày đóng gói không hợp lệ');
+        return;
+      }
+
+      if (harvestDateTs > todayTs) {
+        toast.error('Ngày thu hoạch không thể ở tương lai');
+        return;
+      }
+
+      if (packagingDateTs > todayTs) {
+        toast.error('Ngày đóng gói không thể ở tương lai');
+        return;
+      }
+
+      if (harvestDateTs > packagingDateTs) {
+        toast.error('Ngày thu hoạch phải trước hoặc bằng ngày đóng gói');
         return;
       }
 
@@ -444,6 +470,18 @@ export function ProductForm({ initialData, isEditing }: ProductFormProps) {
           toast.error('Ngày hết hạn chứng nhận không hợp lệ');
           return;
         }
+
+        const certExpiryTs = toUtcDateOnlyTimestamp(certExpiryDate);
+        if (Number.isNaN(certExpiryTs)) {
+          toast.error('Hạn sử dụng không hợp lệ');
+          return;
+        }
+
+        if (packagingDateTs > certExpiryTs) {
+          toast.error('Ngày đóng gói phải trước hoặc bằng hạn sử dụng');
+          return;
+        }
+
         certExpiryIso = certExpiryDate.toISOString();
       }
 

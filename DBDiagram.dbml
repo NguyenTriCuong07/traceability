@@ -1,0 +1,115 @@
+Project Traceability {
+  database_type: "PostgreSQL"
+  Note: "Detailed logical DBML mapped from MongoDB collections and embedded product subdocuments"
+}
+
+Table users {
+  _id varchar [pk, note: "Mongo ObjectId"]
+  email varchar [not null, unique]
+  password_hash varchar [not null]
+  role varchar [not null, default: "viewer", note: "enum: admin, viewer"]
+  created_at timestamp [not null]
+  last_login timestamp [note: "default: null"]
+  email_verified boolean [not null, default: false]
+  email_verified_at timestamp [note: "default: null"]
+
+  indexes {
+    (email)
+  }
+}
+
+Table products {
+  _id varchar [pk, note: "Mongo ObjectId"]
+  name varchar [not null]
+  slug varchar [not null, unique]
+  batch_code varchar [not null]
+  description text
+  image_url text
+
+  qr_code_url text [not null]
+  unique_token varchar [not null, unique]
+  view_count int [not null, default: 0]
+  scan_count int [not null, default: 0]
+  last_viewed_at timestamp
+  last_scanned_at timestamp
+  created_at timestamp [not null]
+  updated_at timestamp [not null]
+  expires_at timestamp
+
+  indexes {
+    (slug)
+    (batch_code)
+    (created_at)
+  }
+}
+
+Table product_origins {
+  _id varchar [pk, note: "Logical row id"]
+  product_id varchar [not null, unique, ref: > products._id, note: "1-1 from products.origin"]
+  region varchar [not null]
+  province varchar [not null]
+  district varchar
+  farm_name varchar [not null]
+  producer_name varchar [not null]
+  coordinates_lat decimal
+  coordinates_lng decimal
+}
+
+Table product_traceability {
+  _id varchar [pk, note: "Logical row id"]
+  product_id varchar [not null, unique, ref: > products._id, note: "1-1 from products.traceability"]
+  status varchar [not null, default: "Đang sơ chế", note: "enum: Đang lưu thông, Đang sơ chế, Đã bán hết"]
+  planting_date timestamp [not null]
+  harvest_date timestamp [not null]
+}
+
+Table product_certifications {
+  _id varchar [pk, note: "Logical row id"]
+  traceability_id varchar [not null, unique, ref: > product_traceability._id, note: "1-1 from traceability.certification"]
+  organic boolean [not null, default: false]
+  certifier varchar
+  cert_number varchar
+  cert_expiry timestamp
+}
+
+Table product_pesticides {
+  id int [pk, increment]
+  traceability_id varchar [not null, ref: > product_traceability._id]
+  pesticide_name varchar [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (traceability_id)
+    (traceability_id, sort_order)
+  }
+}
+
+Table product_fertilizers {
+  id int [pk, increment]
+  traceability_id varchar [not null, ref: > product_traceability._id]
+  fertilizer_name varchar [not null]
+  sort_order int [not null, default: 0]
+
+  indexes {
+    (traceability_id)
+    (traceability_id, sort_order)
+  }
+}
+
+Table scanlogs {
+  _id varchar [pk, note: "Mongo ObjectId"]
+  product_id varchar [not null, ref: > products._id]
+  slug varchar [not null]
+  event_type varchar [not null, default: "scan", note: "enum: visit, scan"]
+  scanned_at timestamp [not null]
+  ip_address varchar
+  country varchar
+  city varchar
+  device_user_agent text
+
+  indexes {
+    (product_id, scanned_at)
+    (product_id, event_type, scanned_at)
+    (slug)
+  }
+}
